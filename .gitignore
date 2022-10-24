@@ -1,0 +1,8 @@
+*.ipynb
+venv
+__pycache__
+/model/data/ytrain_model.csv
+/model/data/application_train.csv
+/model/data/xtest_model.csv
+/model/data/xtrain_model.csv
+/model/data/ytest_model.csv
