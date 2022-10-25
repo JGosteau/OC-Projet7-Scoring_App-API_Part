@@ -18,11 +18,12 @@ class MasterModel() :
         }
 
     def save_model(self, method = 'pickle') :
-        filepath = os.path.join(self.record_path, self.name+'.jlib')
         if method == 'joblib' :
+            filepath = os.path.join(self.record_path, self.name+'.jlib')
             import joblib
             joblib.dump(self, filepath,  compress=3)
-        elif method == 'pickle' :
+        elif method == 'pickle' :  
+            filepath = os.path.join(self.record_path, self.name+'.pkl')
             import pickle
             with open(filepath, 'wb') as handle :
                 pickle.dump(self, handle, protocol=-1)
@@ -194,6 +195,7 @@ class Level1(MasterModel):
 
         #labelencoders = [self.MLE.labelencoders[i] for i in ix_qualcols]
         labelencoders = self.MLE.labelencoders
+        print('self.MLE fitted ?', self.MLE.fitted)
         #if len(labelencoders) > 0 :
         #    print('le[1/%d] : ' %(len(labelencoders)), labelencoders[0].classes_)
         ct = ColumnTransformer([
@@ -224,11 +226,13 @@ class Level1(MasterModel):
         self.init_model(qualcols, quantcols)
         self.fit(xtrain, ytrain)
 
-    def auto_feature_selection_fit(self, xtrain, ytrain, nfeatures, step = 1) :
+    def auto_feature_selection_fit(self, xtrain, ytrain, nfeatures, step = 1, features = None) :
         from sklearn.feature_selection import RFE
         import numpy as np
+        if features is None :
+            features = xtrain.columns[~xtrain.columns.isin(self.forbid_columns)]
 
-        self.fit_features(xtrain, ytrain)
+        self.fit_features(xtrain, ytrain, features = features)
         classif = self.model[-1]
         prepro = self.model[:-1]
         selector = RFE(classif, n_features_to_select = nfeatures, step = step)
@@ -238,6 +242,9 @@ class Level1(MasterModel):
         quantcols_all = np.load(os.path.join(os.path.dirname(__file__),"data", 'quantcols.npy'), allow_pickle=True)
         qualcols = xtrain.columns[xtrain.columns.isin(qualcols_all)]
         quantcols = xtrain.columns[xtrain.columns.isin(quantcols_all)]
+        
+        qualcols = features[np.isin(features,self.qualcols)]
+        quantcols = features[np.isin(features,self.quantcols)]
 
         cols = np.array(list(quantcols) + list(qualcols))
         cols = cols[~np.isin(cols, self.forbid_columns)]

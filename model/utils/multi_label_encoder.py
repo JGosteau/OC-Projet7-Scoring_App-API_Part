@@ -10,10 +10,12 @@ class MultiLabelEncoder():
 
     def set_params(self, labelencoders = {}):
         self.labelencoders = labelencoders
+        #print('MLE - found le : ', labelencoders.keys())
         if len(self.labelencoders) == 0 : 
             self.fitted = False
         else :
             self.fitted = True
+        print('MLE - fitted ?', self.fitted)
         
     def get_params(self, deep = False):
         return {}
@@ -24,6 +26,7 @@ class MultiLabelEncoder():
         except :
             cols = list(range(len(X)))
         if self.fitted == False :
+            print('MLE - fitting')
             x = np.array(X)
             for i in range(x.shape[1]):
                 le = LabelEncoder()
@@ -40,8 +43,13 @@ class MultiLabelEncoder():
         x = np.array(X)
         new_X = np.zeros(x.shape)
         for i in range(x.shape[1]):
-            le = self.labelencoders[cols[i]]
-            new_X[:, i] = le.transform(x[:, i])
+            try :
+                le = self.labelencoders[cols[i]]
+                new_X[:, i] = le.transform(x[:, i])
+            except : 
+                print('Error', i, cols[i])
+                le = self.labelencoders[cols[i]]
+                new_X[:, i] = le.transform(x[:, i])
         return new_X
 
     def inverse_transform(self, X):

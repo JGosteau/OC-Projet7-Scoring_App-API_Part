@@ -6,3 +6,14 @@ __pycache__
 /model/data/xtest_model.csv
 /model/data/xtrain_model.csv
 /model/data/ytest_model.csv
+/model/data/installments_payments.csv
+/model/data/POS_CASH_balance.csv
+/model/data/previous_application.csv
+/model/data/sample_submission.csv
+/model/data/bureau.csv
+/model/data/bureau_balance.csv
+/model/data/credit_card_balance.csv
+/model/data/HomeCredit_columns_description.csv
+bureau.csv
+/model/data/application_test.csv
+/model/data/train.csv

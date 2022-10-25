@@ -29,7 +29,8 @@ for file in os.listdir(dirpath) :
 from model.traintest import get_train_test
 print('Loading train and test set')
 #xtrain, xtest, ytrain, ytest =  get_train_test()
-xtest = pd.read_csv(os.path.join(os.path.dirname(__file__), '..', 'model', 'data', 'application_test.csv'), compression='gzip')[used_cols]
+#xtest = pd.read_csv(os.path.join(os.path.dirname(__file__), '..', 'model', 'data', 'application_test.csv'), compression='gzip')[used_cols]
+xtest = pd.read_csv(os.path.join(os.path.dirname(__file__), '..', 'model', 'data', 'test.csv'), compression='gzip')[used_cols]
 
 with open(os.path.join(os.path.dirname(__file__), '..', 'model', 'data', 'unique_qualcols.pkl'), 'rb') as handle :
     unique_qualcols = pickle.load(handle)
@@ -204,9 +205,6 @@ class Predict(Resource) :
                 x[feat] = str(xjson[feat])
             else :
                 x[feat] = xjson[feat]
-
-
-        #print(x[md.features])
         contribs = models_list[model_name].predict_contrib(x)
         probability = contribs['Contributions']['Prediction']
         return {
