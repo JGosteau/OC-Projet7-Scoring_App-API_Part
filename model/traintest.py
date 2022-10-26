@@ -72,7 +72,7 @@ def feature_engineering_data():
 
     
 
-def create_train_test(random_state = RANDOM_STATE):   
+def create_train_test(random_state = RANDOM_STATE, save = True):   
     from sklearn.model_selection import train_test_split
     from model.utils.filtering import filter_column_or_index
     from model.utils.multi_label_encoder import MultiLabelEncoder
@@ -87,44 +87,62 @@ def create_train_test(random_state = RANDOM_STATE):
     qualcols = X.columns[(X.dtypes == object) | (X.columns.str.contains('^FLAG'))]
     quantcols = X.columns[(X.dtypes != object) & (~X.columns.str.contains('^FLAG'))]
     X[qualcols] = X[qualcols].astype(str)
+    Y = app[['TARGET']]
+    used_cols = np.array(X.columns)
+    unique_qualcols = X[qualcols].apply(np.unique)
 
     MLE = MultiLabelEncoder()
     MLE.fit(X[qualcols])
 
-    Y = app.TARGET
-    
     var_models = {}
     var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X,Y, train_size=8000, random_state=random_state)
     print('xtrain and xtest created')
-    for var in var_models :
-        var_models[var].to_csv(os.path.join(os.path.dirname(__file__),"data", "%s.csv" %(var)), index=False, compression='gzip')
+    if save :
+        for var in var_models :
+            var_models[var].to_csv(os.path.join(os.path.dirname(__file__),"data", "%s.csv" %(var)), index=False, compression='gzip')
+            
+        np.save(os.path.join(os.path.dirname(__file__),"data", 'used_cols.npy'), used_cols)
+        np.save(os.path.join(os.path.dirname(__file__),"data", 'qualcols.npy'), qualcols)
+        np.save(os.path.join(os.path.dirname(__file__),"data", 'quantcols.npy'), quantcols)
+        
+        import pickle
+        with open(os.path.join(os.path.dirname(__file__),"data", "unique_qualcols.pkl"), 'wb') as handle :
+            pickle.dump(unique_qualcols, handle, protocol=4)
+        with open(os.path.join(os.path.dirname(__file__), "data", 'MLE.pkl'), 'wb') as handle :
+            pickle.dump(MLE, handle, protocol=4)
     
-    used_cols = np.array(X.columns)
-    np.save(os.path.join(os.path.dirname(__file__),"data", 'used_cols.npy'), used_cols)
-    np.save(os.path.join(os.path.dirname(__file__),"data", 'qualcols.npy'), qualcols)
-    np.save(os.path.join(os.path.dirname(__file__),"data", 'quantcols.npy'), quantcols)
-    xtrain = var_models['xtrain_model']
-    median_train = xtrain[quantcols].median().reset_index()
-    means_train = xtrain[quantcols].mean().reset_index()
-    mode_train = xtrain[qualcols].mode().reset_index()
-    print("median, mean and mode obtained")
-
-    median_train.to_csv(os.path.join(os.path.dirname(__file__),"data", "median.csv" ), index=False, compression='gzip')
-    means_train.to_csv(os.path.join(os.path.dirname(__file__),"data", "means.csv" ), index=False, compression='gzip')
-    mode_train.to_csv(os.path.join(os.path.dirname(__file__),"data", "mode_train.csv" ), index=False, compression='gzip')
-    print("median, mean and mode saved")
-
-    #unique_qualcols = X[qualcols].apply(np.unique)
-    unique_qualcols = X[qualcols].astype(str).apply(np.unique)
-    #unique_qualcols.to_json(os.path.join(os.path.dirname(__file__),"data", "unique_qualcols.csv" ), index=False, compression='gzip')
-    
-    
-    import pickle
-    with open(os.path.join(os.path.dirname(__file__),"data", "unique_qualcols.pkl"), 'wb') as handle :
-        pickle.dump(unique_qualcols, handle, protocol=4)
-    #with open(os.path.join(os.path.dirname(__file__), "data", 'MLE.pkl'), 'wb') as handle :
-    #    pickle.dump(MLE, handle, protocol=4)
+    del MLE
     gc.collect()
+    return var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model']
+
+def general_analysis(x, y, save=True) :
+    import copy
+    qualcols = np.load(os.path.join(os.path.dirname(__file__), "data", 'qualcols.npy'), allow_pickle=True)
+    quantcols = np.load(os.path.join(os.path.dirname(__file__), "data", 'quantcols.npy'), allow_pickle=True)
+    list_func = {}
+    for col in quantcols :
+        list_func[col] = [
+            'max','min','mean', 
+            'median', ('q1', lambda x : np.quantile(x,0.25)), ('q3', lambda x : np.quantile(x,0.75)), 
+            ('d1', lambda x : np.quantile(x,0.1)), ('d9', lambda x : np.quantile(x,0.9))
+        ]
+    for col in qualcols :
+        list_func[col] = [('mode', pd.Series.mode)]
+
+    xinfo = copy.deepcopy(x)
+    xinfo['TARGET'] = 'all'
+    info = xinfo.groupby('TARGET').agg(list_func)
+    xinfo['TARGET'] = y
+    info = pd.concat((info, xinfo.groupby('TARGET').agg(list_func)))
+    info = info.swaplevel(0,1,1).sort_index(1)
+    
+    if save :
+        info.reset_index().to_csv(os.path.join(os.path.dirname(__file__),"data", "info.csv" ), index=False, compression='gzip')
+    del xinfo
+    gc.collect()
+    return info
+
+
 
 def get_train_test() :
     vars = []

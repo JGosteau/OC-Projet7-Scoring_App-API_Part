@@ -1,5 +1,5 @@
 if __name__ == '__main__' :
-    from model.traintest import get_train_test, create_train_test, feature_engineering_data
+    from model.traintest import get_train_test, create_train_test, feature_engineering_data, general_analysis
     from model.models import Level1
     import numpy as np
     import pandas as pd
@@ -9,17 +9,22 @@ if __name__ == '__main__' :
     # Feature Engineering.
     print("Feature Engineering.")
     #feature_engineering_data()
-
+    save_files = True
     # Sépare et stocke les données de application_train en données d'entrainement et de test.
     t0 = time.time()
     print("Sépare et stocke les données de application_train en données d'entrainement et de test.")
-    create_train_test()
-    xtrain, xtest, ytrain, ytest = get_train_test()
-    
-    loan_rate_list = np.linspace(0,1,101)
+    xtrain, xtest, ytrain, ytest = create_train_test(save = save_files)
+    #xtrain, xtest, ytrain, ytest = get_train_test()
     t=time.time()
     print(pd.to_timedelta((t-t0)*1e9))
+
     t0 = time.time()
+    print("Récupère les moyennes /médianes, etc des données d'entrainement.")
+    info = general_analysis(xtrain, ytrain, save = save_files)
+    t=time.time()
+    print(pd.to_timedelta((t-t0)*1e9))
+
+    loan_rate_list = np.linspace(0,1,101)
     
     app_features = np.load(os.path.join(os.path.dirname(__file__),"model", "data", 'app_columns.npy'), allow_pickle=True)
     features = app_features[np.isin(app_features, xtrain.columns)]
