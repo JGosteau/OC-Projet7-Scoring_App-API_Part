@@ -3,6 +3,7 @@ import pandas as pd
 
 MAX_VERB_LEVEL = 3
 
+
 def verbose(verb_string, verbose_level = 0):
     """
     Fonction permettant de définir plusieurs niveaux de mode verbeux.
@@ -99,3 +100,13 @@ def filter_column_or_index(df,axis = 0,
         ], verbose_level)  
         print(verb, end = '')
         return df.drop(index = suppressed_index)
+
+
+def iqr_filter(x, iqr_factor = 1.5) :
+    q1 = x.quantile(0.25)
+    q3 = x.quantile(0.75)
+    iqr = q3-q1
+    sum_condition = ((x>q3+iqr_factor*iqr) | (x<q1-iqr_factor*iqr)).sum(axis = 1)
+
+    keep_index = sum_condition[sum_condition<=0].index
+    return keep_index

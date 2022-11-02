@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 import gc
-#train_path = os.path.join(os.path.dirname(__file__),"data", "application_train.csv")
+
 train_path = os.path.join(os.path.dirname(__file__),"data", "train.csv")
 RANDOM_STATE = 123
 
@@ -70,11 +70,11 @@ def feature_engineering_data():
     df_train.to_csv(os.path.join(os.path.dirname(__file__),"data", "train.csv" ), index=True, compression='gzip')
     df_test.to_csv(os.path.join(os.path.dirname(__file__),"data", "test.csv" ), index=True, compression='gzip')
 
-    
+
 
 def create_train_test(random_state = RANDOM_STATE, save = True):   
     from sklearn.model_selection import train_test_split
-    from model.utils.filtering import filter_column_or_index
+    from model.utils.filtering import filter_column_or_index, iqr_filter
     from model.utils.multi_label_encoder import MultiLabelEncoder
     import gc
     app = pd.read_csv(train_path, compression='gzip')
@@ -90,13 +90,39 @@ def create_train_test(random_state = RANDOM_STATE, save = True):
     Y = app[['TARGET']]
     used_cols = np.array(X.columns)
     unique_qualcols = X[qualcols].apply(np.unique)
-
+    app_features = np.load(os.path.join(os.path.dirname(__file__),"data", 'app_columns.npy'), allow_pickle=True)
+    keep_index = iqr_filter(X[app_features[np.isin(app_features, quantcols)]])
+    keep_index = X.index
+    
     MLE = MultiLabelEncoder()
     MLE.fit(X[qualcols])
 
+    print('length before iqr_filter : ', len(X), len(Y))
+    not_X = X[~X.index.isin(keep_index)]
+    not_Y = Y[~Y.index.isin(keep_index)]
+    X = X.loc[keep_index]
+    Y = Y.loc[keep_index]
+    print('length after iqr_filter : ', len(X), len(Y))
+
+
     var_models = {}
-    var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X,Y, train_size=8000, random_state=random_state)
+    #var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X,Y, train_size=8000, random_state=random_state)
+    from imblearn.under_sampling import RandomUnderSampler
+    rus = RandomUnderSampler(sampling_strategy=1, random_state=random_state)
+    xsample, ysample = rus.fit_resample(X,Y)
+    index_accepted_under_sample = X[X.SK_ID_CURR.isin(xsample.SK_ID_CURR)].index
+    index_rejected_under_sample = X[~X.SK_ID_CURR.isin(xsample.SK_ID_CURR)].index
+    print('accepted under sample : %d', len(index_accepted_under_sample))
+    print('rejected under sample : %d', len(index_rejected_under_sample))
+
+    var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X.loc[index_accepted_under_sample],Y.loc[index_accepted_under_sample], train_size=4000, random_state=random_state)
+    
     print('xtrain and xtest created')
+    print()
+    print('shape test before : ', var_models['xtest_model'].shape)
+    var_models['xtest_model'] = pd.concat((var_models['xtest_model'], X.loc[index_rejected_under_sample]))
+    var_models['ytest_model'] = pd.concat((var_models['ytest_model'], Y.loc[index_rejected_under_sample]))
+    print('shape test after : ', var_models['xtest_model'].shape)
     if save :
         for var in var_models :
             var_models[var].to_csv(os.path.join(os.path.dirname(__file__),"data", "%s.csv" %(var)), index=False, compression='gzip')

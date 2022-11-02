@@ -16,6 +16,7 @@ class MasterModel() :
             'exp_cost_func' : {},
             'optimized_triggers' : {}
         }
+        self.classifier = 'RFC'
 
     def save_model(self, method = 'pickle') :
         if method == 'joblib' :
@@ -29,12 +30,12 @@ class MasterModel() :
                 pickle.dump(self, handle, protocol=-1)
 
 
-        
-        
+
 
     def fit(self, xtrain, ytrain) :
         if self.model is not None :
             self.model.fit(xtrain, ytrain.TARGET.ravel())
+
 
     def predict(self, x) :
         if self.model is not None :
@@ -47,39 +48,82 @@ class MasterModel() :
             return ypred
 
     def save_predict(self, x, y) :
+        from sklearn.metrics import roc_auc_score
         yproba = self.predict(x)
         #self.yproba = yproba.to_dict()
         #self.y = y.to_dict()
         self.yproba = yproba
         self.y = np.array(y)
+        self.roc = roc_auc_score(self.y, self.yproba[:,1])
         return yproba
 
     def predict_contrib_many(self, x) :
         from treeinterpreter import treeinterpreter as ti
         if self.model is not None :
-            sampling_pos = np.where(np.isin(list(self.model.named_steps.keys()), 'sampling'))[0]
-            if len(sampling_pos) > 0 :
-                ix_end_prepro = sampling_pos[0]
-            else :
-                ix_end_prepro = -1
-            prepro = self.model[:ix_end_prepro]
-            classif = self.model[-1]
+            if self.classifier == 'RFC' :
+                sampling_pos = np.where(np.isin(list(self.model.named_steps.keys()), 'sampling'))[0]
+                if len(sampling_pos) > 0 :
+                    ix_end_prepro = sampling_pos[0]
+                else :
+                    ix_end_prepro = -1
+                prepro = self.model[:ix_end_prepro]
+                classif = self.model[-1]
 
-            xprepro = prepro.transform(x)
-            prediction, bias, contributions = ti.predict(classif, xprepro)
-            return prediction, bias, contributions
+                xprepro = prepro.transform(x)
+                prediction, bias, contributions = ti.predict(classif, xprepro)
+                return prediction, bias, contributions
     
+    def get_prepro_class(self) :
+        sampling_pos = np.where(np.isin(list(self.model.named_steps.keys()), 'sampling'))[0]
+        if len(sampling_pos) > 0 :
+            ix_end_prepro = sampling_pos[0]
+        else :
+            ix_end_prepro = -1
+        self.prepro = self.model[:ix_end_prepro]
+        self.classif = self.model[-1]
+
+    def create_shap_explainer(self, x) :
+        import shap
+        x_shap = self.prepro.transform(x)
+        self.explainer_ = shap.TreeExplainer(self.classif, x_shap)
+
+    def explainer(self, x) :
+        x_shap =  self.prepro.transform(x)
+        return self.explainer_(x_shap)
+
+
+    def shap_contribs(self, x) :
+        prediction = self.predict(x)
+        shap_values = self.explainer( x)
+        bias = shap_values.base_values
+        contributions = shap_values.values
+        return prediction, bias, contributions
+
     def predict_contrib(self, x) :
         if self.model is not None :
-            prediction, bias, contributions = self.predict_contrib_many(x)
-            contribs = contributions[0,:,0].tolist()
-            contribs.insert(0, bias[0,0])
+            if self.classifier == 'RFC' : 
+                prediction, bias, contributions = self.predict_contrib_many(x)
+                contribs = contributions[0,:,0].tolist()
+                contribs.insert(0, bias[0,0])
+            else :
+                try :
+                    prediction, bias, contributions = self.shap_contribs(x)
+                    contribs = contributions[0,:,0].tolist()
+                    contribs.insert(0, bias[0,0])
+                except : 
+                    prediction, bias, contributions = self.shap_contribs(x)
+                    contribs = contributions[0].tolist()
+                    contribs.insert(0, bias[0])
             contribs = np.array(contribs)
             contrib_df = pd.DataFrame(data=contribs, index=["Base"] + list(self.features), columns=["Contributions"])
             prediction = contrib_df.Contributions.sum()
             contrib_df.loc["Prediction"] = prediction
             contrib_df['values'] = x.iloc[0]
             return contrib_df
+
+                
+
+
 
     def get_conf_mat(self, y=None, x=None, yproba=None, trigger=0.5, factor = None):
         from sklearn.metrics import confusion_matrix, roc_auc_score
@@ -158,7 +202,7 @@ class MasterModel() :
 
 
 class Level1(MasterModel):
-    def __init__(self, name='Scoring Level 1', forbid_columns = ['SK_ID_CURR'], record_path=os.path.join(os.path.dirname(__file__), 'saved_models')) :
+    def __init__(self, name='Scoring Level 1', forbid_columns = ['SK_ID_CURR'], record_path=os.path.join(os.path.dirname(__file__), 'saved_models'), classifier = 'RFC') :
         self.name = name
         self.record_path = record_path
         self.description = {
@@ -170,7 +214,7 @@ class Level1(MasterModel):
         self.random_state = RANDOM_STATE
         self.forbid_columns = forbid_columns
         self.features = None
-
+        self.classifier = classifier
         self.cost_func_ = {
             'exp_cost_func' : {},
             'optimized_triggers' : {}
@@ -203,12 +247,38 @@ class Level1(MasterModel):
             #('object', FunctionTransformer(), qualcols),
             ('object', MultiLabelEncoder(labelencoders = labelencoders), qualcols),
         ])
-
-        steps = [ 
-            ('column_transf', ct),
-            ('sampling', RandomUnderSampler(sampling_strategy=1, random_state=self.random_state)),
-            ('classifier', RandomForestClassifier(random_state=self.random_state)),
-        ]
+        if self.classifier == 'RFC' :
+            steps = [ 
+                ('column_transf', ct),
+                #('sampling', RandomUnderSampler(sampling_strategy=1, random_state=self.random_state)),
+                ('classifier', RandomForestClassifier(random_state=self.random_state)),
+            ]
+        elif self.classifier == 'LGB' : 
+            import lightgbm as lgb
+            steps = [ 
+                ('column_transf', ct),
+                #('sampling', RandomUnderSampler(sampling_strategy=1, random_state=self.random_state)),
+                ('classifier', lgb.LGBMClassifier(
+                                    n_estimators=10000,
+                                    learning_rate=0.02,
+                                    num_leaves=34,
+                                    colsample_bytree=0.9497036,
+                                    subsample=0.8715623,
+                                    max_depth=8,
+                                    reg_alpha=0.041545473,
+                                    reg_lambda=0.0735294,
+                                    min_split_gain=0.0222415,
+                                    min_child_weight=39.3259775, 
+                                    random_state = self.random_state)
+                                   ),
+            ]
+        elif self.classifier == 'GBC' : 
+            from sklearn.ensemble import GradientBoostingClassifier
+            steps = [ 
+                ('column_transf', ct),
+                #('sampling', RandomUnderSampler(sampling_strategy=1, random_state=self.random_state)),
+                ('classifier', GradientBoostingClassifier(random_state = self.random_state)),
+            ]
 
         pipeline = Pipeline(steps=steps)
         self.model = pipeline
@@ -236,7 +306,8 @@ class Level1(MasterModel):
         classif = self.model[-1]
         prepro = self.model[:-1]
         selector = RFE(classif, n_features_to_select = nfeatures, step = step)
-        selector.fit(*prepro.fit_resample(xtrain, ytrain.TARGET.ravel()))
+        #selector.fit(*prepro.fit_resample(xtrain, ytrain.TARGET.ravel()))
+        selector.fit(prepro.transform(xtrain), ytrain.TARGET.ravel())
         
         qualcols_all = np.load(os.path.join(os.path.dirname(__file__),"data", 'qualcols.npy'), allow_pickle=True)
         quantcols_all = np.load(os.path.join(os.path.dirname(__file__),"data", 'quantcols.npy'), allow_pickle=True)
@@ -252,5 +323,8 @@ class Level1(MasterModel):
 
         self.fit_features(xtrain, ytrain, features)
         self.description['RFE'] = nfeatures
+
+
+
 
 
