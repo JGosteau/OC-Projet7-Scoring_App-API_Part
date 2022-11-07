@@ -14,7 +14,8 @@ used_cols = np.load(os.path.join(os.path.dirname(__file__),"..", "model", "data"
 qualcols = np.load(os.path.join(os.path.dirname(__file__),"..", "model", "data", 'qualcols.npy'), allow_pickle=True)
 quantcols = np.load(os.path.join(os.path.dirname(__file__),"..", "model", "data", 'quantcols.npy'), allow_pickle=True)
 
-
+with open(os.path.join(os.path.dirname(__file__), '..','model', 'data', 'MLE.pkl'),'rb') as handle :
+    mle = pickle.load(handle)
 
 models_list = {}
 for file in os.listdir(dirpath) :
@@ -127,10 +128,8 @@ class GetInfoModel(Resource) :
         model_name = data["model"]
         md = models_list[model_name]
 
-        quant = list(np.array(md.features)[np.isin(md.features, md.quantcols)])
-        qual = list(np.array(md.features)[np.isin(md.features, md.qualcols)])
-        fi = md.model['classifier'].feature_importances_
-        df = pd.DataFrame({'feature' : quant+qual, 'feature_importances' : fi})
+        fi = md.classif.feature_importances_
+        df = pd.DataFrame({'feature' : md.features, 'feature_importances' : fi})
         df = df.sort_values('feature_importances', ascending = False).reset_index(drop=True)
 
         res = {
@@ -178,6 +177,7 @@ class PredictId(Resource) :
                 'id_found' : False,
                 'probability' : None
             }
+        x[qualcols] = mle.transform(x[qualcols])
         contribs = models_list[model_name].predict_contrib(x)
         probability = contribs['Contributions']['Prediction']
         return {
@@ -205,8 +205,10 @@ class Predict(Resource) :
         for feat in md.features :
             if feat in qualcols :
                 x[feat] = str(xjson[feat])
+                x[feat] = mle.transform(x[[feat]])
             else :
                 x[feat] = xjson[feat]
+        
         contribs = models_list[model_name].predict_contrib(x)
         probability = contribs['Contributions']['Prediction']
         return {

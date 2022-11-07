@@ -1,4 +1,4 @@
-*.ipynb
+test.ipynb
 venv
 __pycache__
 /model/data/ytrain_model.csv

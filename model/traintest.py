@@ -72,7 +72,7 @@ def feature_engineering_data():
 
 
 
-def create_train_test(random_state = RANDOM_STATE, save = True):   
+def create_train_test(train_size=4000, random_state = RANDOM_STATE, save = True):   
     from sklearn.model_selection import train_test_split
     from model.utils.filtering import filter_column_or_index, iqr_filter
     from model.utils.multi_label_encoder import MultiLabelEncoder
@@ -115,7 +115,7 @@ def create_train_test(random_state = RANDOM_STATE, save = True):
     print('accepted under sample : %d', len(index_accepted_under_sample))
     print('rejected under sample : %d', len(index_rejected_under_sample))
 
-    var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X.loc[index_accepted_under_sample],Y.loc[index_accepted_under_sample], train_size=4000, random_state=random_state)
+    var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X.loc[index_accepted_under_sample],Y.loc[index_accepted_under_sample], train_size=train_size, random_state=random_state)
     
     print('xtrain and xtest created')
     print()
