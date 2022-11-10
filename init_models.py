@@ -91,7 +91,8 @@ print('Score du modèle à %d variables (sans score de solvabilité) : %.3f' %(n
 
 # Sauvergarde des données
 loan_rate_list = np.linspace(0,1,101)
-for i, m in enumerate([gbc_w_source, gbc_w_source_rfe, gbc_wo_source, gbc_wo_source_rfe]):
+#for i, m in enumerate([gbc_w_source, gbc_w_source_rfe, gbc_wo_source, gbc_wo_source_rfe]):
+for i, m in enumerate([gbc_w_source_rfe, gbc_wo_source_rfe]):
     print(i)
     m.save_predict(xtest, ytest)
     m.create_shap_explainer(xtrain)
