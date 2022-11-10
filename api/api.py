@@ -135,7 +135,8 @@ class GetInfoModel(Resource) :
         res = {
             "description" : md.description,
             "features" : list(df.feature),
-            "feature_importances" : list(df.feature_importances)
+            "feature_importances" : list(df.feature_importances),
+            "roc" : md.roc
         }
         return res
 api.add_resource(GetInfoModel, '/api/getinfomodel')
@@ -156,11 +157,10 @@ class GetInfoId(Resource) :
         id = int(data['SK_ID_CURR'])
         if id in list(xtest.SK_ID_CURR) :
             x = xtest.loc[xtest.SK_ID_CURR == id]
+            return x.iloc[0].to_dict()
         else :
             print('Not Found')
-            x = xtrain.iloc[[0]]
-            x[x.columns] = np.nan
-        return x.iloc[0].to_dict()
+            return None
 api.add_resource(GetInfoId, '/api/getinfoid')
 
 
@@ -195,13 +195,6 @@ class Predict(Resource) :
         x = pd.DataFrame(index = [0], columns=used_cols)
 
         xjson = data["x"]
-        #ask_features = list(xjson.keys())
-        """
-        for feat in md.features :
-            if feat not in ask_features :
-                print('%s not asked --> median' %(feat))
-            else :
-                x[feat] = xjson[feat]"""
         for feat in md.features :
             if feat in qualcols :
                 x[feat] = str(xjson[feat])

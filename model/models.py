@@ -27,6 +27,7 @@ class MasterModel(BaseEstimator) :
             self.classif = RandomForestClassifier(random_state=random_state)
         else :
             self.classif = classif
+        self.feature_importances = None
 
     def get_params(self, deep=True) :
         return {
@@ -61,8 +62,13 @@ class MasterModel(BaseEstimator) :
             xprepro, yprepro = self.prepro.fit_resample(xtrain[self.features], ytrain)
             from sklearn.model_selection import train_test_split 
             xprepro, _, yprepro, _ = train_test_split(xprepro, yprepro, train_size=700, random_state=self.random_state)
-
         self.classif.fit(xprepro,yprepro)
+        try :
+            fi = self.classif.feature_importances_
+            self.feature_importances = pd.DataFrame({'feature' : self.features, 'feature_importances' : fi}).sort_values('feature_importances', ascending=False)
+        except :
+            self.feature_importances = None
+
 
     def predict(self, x) :
         if self.prepro_type == 'sklearn' :
@@ -135,20 +141,21 @@ class MasterModel(BaseEstimator) :
         prediction = contrib_df.Contributions.sum()
         contrib_df.loc["Prediction"] = prediction
         contrib_df['values'] = x.iloc[0]
+        if self.feature_importances is not None :
+            df = pd.concat((contrib_df.loc[['Base']],contrib_df.loc[self.feature_importances.feature], contrib_df.loc[['Prediction']]))
+            contrib_df = df
+
         return contrib_df
 
     def get_conf_mat(self, y=None, x=None, yproba=None, trigger=0.5, factor = None):
         from sklearn.metrics import confusion_matrix, roc_auc_score
         if yproba is None :
             if y is None or x is None :
-                #yproba = pd.DataFrame(self.yproba)
-                #y = pd.DataFrame(self.y)
                 yproba = self.yproba
                 y = self.y
             else :
                 yproba = self.predict(x)
 
-        #ypred = np.where(yproba[0] >= trigger, 0,1)
         ypred = np.where(yproba[:,0] >= trigger, 0,1)
         if factor is None :
             factor = 1/len(y)
@@ -169,8 +176,6 @@ class MasterModel(BaseEstimator) :
         data = []
         from sklearn.metrics import confusion_matrix
         if y is None or x is None :
-            #yproba = pd.DataFrame(self.yproba)
-            #y = pd.DataFrame(self.y)
             yproba = self.yproba
             y = self.y
         else :
@@ -179,11 +184,8 @@ class MasterModel(BaseEstimator) :
         for trigger in trigger_list :
             conf_mat, roc = self.get_conf_mat(y,yproba=yproba, trigger=trigger)
             ypred = np.where(yproba[:,0] >= trigger, 0,1)
-            #conf_mat_rel = confusion_matrix(y, ypred, normalize='true')
             TP = conf_mat[0,0]*len(y)/n_pos
             TN = conf_mat[1,1]*len(y)/n_neg
-            #TP = conf_mat_rel[0,0]
-            #TN = conf_mat_rel[1,1]
             for loan_rate in loan_rate_list :
                 for reimb_ratio in reimb_ratio_list :
                     cost = self.cost_func(conf_mat=conf_mat, loan_rate=loan_rate, reimb_ratio=reimb_ratio)

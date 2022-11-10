@@ -106,7 +106,6 @@ def create_train_test(train_size=4000, random_state = RANDOM_STATE, save = True)
 
 
     var_models = {}
-    #var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model'] = train_test_split(X,Y, train_size=8000, random_state=random_state)
     from imblearn.under_sampling import RandomUnderSampler
     rus = RandomUnderSampler(sampling_strategy=1, random_state=random_state)
     xsample, ysample = rus.fit_resample(X,Y)
