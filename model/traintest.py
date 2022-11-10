@@ -9,6 +9,9 @@ RANDOM_STATE = 123
 
 
 def feature_engineering_data():
+    """
+    Automatise les taches de features engineering sur les historiques des clients et les fusionne en un fichier 'train.csv' et 'test.csv'.
+    """
     from model.utils.preprocessing import application_train_test, bureau_and_balance, previous_applications, installments_payments, credit_card_balance, pos_cash
     t0 = time.time()*1e9
     print('App : ', end = '')
@@ -73,6 +76,10 @@ def feature_engineering_data():
 
 
 def create_train_test(train_size=4000, random_state = RANDOM_STATE, save = True):   
+    """
+    Automatise les tâches de feature engineering sur les informations comportementale, la fusion avec les historiques, la re-échantillonage via RandomUnderSampler
+    et la séparation en données d'entrainement et de test.
+    """
     from sklearn.model_selection import train_test_split
     from model.utils.filtering import filter_column_or_index, iqr_filter
     from model.utils.multi_label_encoder import MultiLabelEncoder
@@ -141,6 +148,13 @@ def create_train_test(train_size=4000, random_state = RANDOM_STATE, save = True)
     return var_models['xtrain_model'], var_models['xtest_model'], var_models['ytrain_model'], var_models['ytest_model']
 
 def general_analysis(x, y, save=True) :
+    """
+    Récupère et enregistre les moyennes, médiannes, quantiles, variables qualitatives et quantitatives du jeu de données.
+    @paramètre :
+        - x (Obligatoire) : (pandas.DataFrame) : jeu de données
+        - y (Obligatoire) : (array) : Targets
+        - save (Optionel) : Sauvegarde les données si True.
+    """
     import copy
     qualcols = np.load(os.path.join(os.path.dirname(__file__), "data", 'qualcols.npy'), allow_pickle=True)
     quantcols = np.load(os.path.join(os.path.dirname(__file__), "data", 'quantcols.npy'), allow_pickle=True)
@@ -170,6 +184,9 @@ def general_analysis(x, y, save=True) :
 
 
 def get_train_test() :
+    """
+    Charge les données train et test.
+    """
     vars = []
     for var in ['xtrain_model','xtest_model','ytrain_model','ytest_model'] :
         vars.append(pd.read_csv(os.path.join(os.path.dirname(__file__),"data", "%s.csv" %(var)), compression='gzip'))

@@ -5,9 +5,18 @@ import gc
 import os 
 
 def datapath(filename) :
+    """
+    Retourne le chemin vers un fichier.
+    """
     return os.path.join(os.path.dirname(__file__), '..', 'data', filename)
 
 def one_hot_encoder(df, nan_as_category = True):
+    """
+    Equivalent du OneHotEncoder avec pd.get_dummies
+    @retourne :
+        - df (pandas.DataFrame) : nouveau jeu de données.
+        - new_columns (array) : liste des variables créées.
+    """
     original_columns = list(df.columns)
     categorical_columns = [col for col in df.columns if df[col].dtype == 'object']
     df = pd.get_dummies(df, columns= categorical_columns, dummy_na= nan_as_category)
